@@ -304,7 +304,9 @@ def initialize_content(user: KhojUser, regenerate: bool, search_type: Optional[S
             )
             if not status:
                 raise RuntimeError("Failed to update content index")
+            logger.info("✅ Content index initialization completed successfully")
         except Exception as e:
+            logger.error("❌ Content index initialization failed", exc_info=True)
             raise e
 
 
@@ -384,6 +386,7 @@ def update_content_index():
     if not success:
         raise RuntimeError("Failed to update content index")
     logger.info("📪 Content index updated via Scheduler")
+    logger.info("✅ Scheduled content index update completed successfully")
 
 
 @schedule.repeat(schedule.every(22).to(25).hours)

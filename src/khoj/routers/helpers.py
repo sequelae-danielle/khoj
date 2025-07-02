@@ -2807,6 +2807,12 @@ def configure_content(
     if user:
         state.query_cache[user.uuid] = LRU()
 
+    # Log completion status
+    if success:
+        logger.info(f"✅ Content indexing completed successfully for {search_type or 'all'} content types")
+    else:
+        logger.error(f"❌ Content indexing failed for {search_type or 'all'} content types")
+
     return success
 
 
