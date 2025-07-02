@@ -277,10 +277,7 @@ export class KhojChatView extends KhojPaneView {
         // Add chat input field
         let inputRow = contentEl.createDiv("khoj-input-row");
 
-        // Create container for main input controls (top row)
-        let mainInputContainer = inputRow.createDiv("khoj-main-input-container");
-
-        let chatSessions = mainInputContainer.createEl("button", {
+        let chatSessions = inputRow.createEl("button", {
             text: "Chat Sessions",
             attr: {
                 class: "khoj-input-row-button clickable-icon",
@@ -291,7 +288,7 @@ export class KhojChatView extends KhojPaneView {
         setIcon(chatSessions, "history");
 
         // Add file access mode button
-        let fileAccessButton = mainInputContainer.createEl("button", {
+        let fileAccessButton = inputRow.createEl("button", {
             text: "File Access",
             attr: {
                 class: "khoj-input-row-button clickable-icon",
@@ -320,7 +317,7 @@ export class KhojChatView extends KhojPaneView {
             }
         });
 
-        let chatInput = mainInputContainer.createEl("textarea", {
+        let chatInput = inputRow.createEl("textarea", {
             attr: {
                 id: "khoj-chat-input",
                 autofocus: "autofocus",
@@ -337,7 +334,7 @@ export class KhojChatView extends KhojPaneView {
         this.contentEl.addEventListener('keydown', this.handleKeyDown.bind(this));
         this.contentEl.addEventListener('keyup', this.handleKeyUp.bind(this));
 
-        let transcribe = mainInputContainer.createEl("button", {
+        let transcribe = inputRow.createEl("button", {
             text: "Transcribe",
             attr: {
                 id: "khoj-transcribe",
@@ -352,7 +349,7 @@ export class KhojChatView extends KhojPaneView {
         transcribe.addEventListener('touchcancel', async (event) => { await this.speechToText(event) });
         setIcon(transcribe, "mic");
 
-        let send = mainInputContainer.createEl("button", {
+        let send = inputRow.createEl("button", {
             text: "Send",
             attr: {
                 id: "khoj-chat-send",
@@ -382,11 +379,15 @@ export class KhojChatView extends KhojPaneView {
         });
 
         // File type checkboxes (group images)
+        const fileFilterRow = document.createElement('div');
+        fileFilterRow.style.display = 'flex';
+        fileFilterRow.style.alignItems = 'center';
+        fileFilterRow.style.marginTop = '8px';
+
         const fileTypeContainer = document.createElement('div');
         fileTypeContainer.className = 'khoj-file-type-checkboxes';
         fileTypeContainer.style.flex = '1';
-        fileTypeContainer.style.marginLeft = '8px';
-        fileTypeContainer.style.marginRight = '8px';
+        fileTypeContainer.style.marginBottom = '';
         const fileTypeOptions = [
           { label: '.md', value: '.md' },
           { label: '.pdf', value: '.pdf' },
@@ -409,8 +410,8 @@ export class KhojChatView extends KhojPaneView {
         const fileFilterDropdown = document.createElement('select');
         fileFilterDropdown.className = 'khoj-file-filter-dropdown';
         fileFilterDropdown.style.width = '140px'; // Make dropdown skinnier
-        fileFilterDropdown.style.marginLeft = '8px';
-        fileFilterDropdown.style.marginRight = '8px';
+        fileFilterDropdown.style.marginLeft = '16px'; // Add space to the left
+        fileFilterDropdown.style.marginTop = '';
         const fileFilterOptions = [
           { label: 'include all', value: 'include:' },
           { label: 'exclude _khoj', value: 'exclude:_khoj' },
@@ -426,22 +427,13 @@ export class KhojChatView extends KhojPaneView {
         fileFilterDropdown.value = 'exclude:_khoj'; // Explicitly set default for chat
         this.fileFilterDropdown = fileFilterDropdown;
 
-        // Create a container for file filter elements
-        const fileFilterContainer = document.createElement('div');
-        fileFilterContainer.className = 'khoj-file-filter-container';
-        fileFilterContainer.style.display = 'flex';
-        fileFilterContainer.style.alignItems = 'center';
-        fileFilterContainer.style.justifyContent = 'space-between';
-        fileFilterContainer.style.width = '100%';
-        fileFilterContainer.style.marginTop = '8px';
-        fileFilterContainer.style.paddingTop = '8px';
-        fileFilterContainer.style.borderTop = '1px solid var(--background-modifier-border)';
+        fileFilterRow.appendChild(fileTypeContainer);
+        fileFilterRow.appendChild(fileFilterDropdown);
 
-        fileFilterContainer.appendChild(fileTypeContainer);
-        fileFilterContainer.appendChild(fileFilterDropdown);
-
-        // Add file filter container to the input row
-        inputRow.appendChild(fileFilterContainer);
+        // Insert controls below the input row (after all main chat controls)
+        if (inputRow && inputRow.parentElement) {
+          inputRow.parentElement.insertBefore(fileFilterRow, inputRow.nextSibling);
+        }
     }
 
     startSpeechToText(event: KeyboardEvent | MouseEvent | TouchEvent, timeout = 200) {
