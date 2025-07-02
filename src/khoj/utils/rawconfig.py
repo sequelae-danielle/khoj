@@ -172,7 +172,6 @@ class ChatRequestBody(BaseModel):
     filename_prefix_mode: Optional[str] = None
     filename_prefix: Optional[str] = None
     file_extension: Optional[str] = None
-    core_memory_file: Optional[str] = None
 
 
 class Entry:

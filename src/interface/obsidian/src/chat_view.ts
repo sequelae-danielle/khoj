@@ -1595,7 +1595,8 @@ export class KhojChatView extends KhojPaneView {
             }
         }
 
-        // Get open files content if we have access
+        // Get core memory and open files content
+        const coreMemoryContent = await this.getCoreMemoryContent();
         const openFilesContent = await this.getOpenFilesContent();
 
         // Extract mode command if present
@@ -1603,29 +1604,8 @@ export class KhojChatView extends KhojPaneView {
         const modeCommand = modeMatch ? query.substring(0, modeMatch.command.length) : '';
         const queryWithoutMode = modeMatch ? query.substring(modeMatch.command.length).trim() : query;
 
-        // Combine mode, query, and files content (core memory will be handled by backend)
-        const finalQuery = modeCommand + (modeCommand ? ' ' : '') + queryWithoutMode + openFilesContent;
-
-        // Validate core memory file exists if specified
-        let coreMemoryFilePath = null;
-        if (this.setting.coreMemoryFile) {
-            const file = this.app.vault.getAbstractFileByPath(this.setting.coreMemoryFile);
-            if (!file || !(file instanceof TFile) || file.extension !== 'md') {
-                console.warn(`[Khoj] Core memory file not found or invalid: ${this.setting.coreMemoryFile}`);
-            } else {
-                // Get the absolute path to the file using the vault adapter
-                const vaultPath = getVaultAbsolutePath(this.app.vault);
-                const absolutePath = `${vaultPath}/${file.path}`;
-                coreMemoryFilePath = absolutePath;
-                console.log(`[Khoj] Core memory file found: ${this.setting.coreMemoryFile} -> ${absolutePath}`);
-            }
-        }
-
-        // Debug logging to see what's being sent
-        console.log('[Khoj] Final query being sent:', finalQuery);
-        console.log('[Khoj] Query without mode:', queryWithoutMode);
-        console.log('[Khoj] Open files content length:', openFilesContent.length);
-        console.log('[Khoj] Core memory file path:', coreMemoryFilePath);
+        // Combine mode, query, core memory, and open files content
+        const finalQuery = modeCommand + (modeCommand ? ' ' : '') + queryWithoutMode + coreMemoryContent + openFilesContent;
 
         // Get chat response from Khoj backend
         const chatUrl = `${this.setting.khojUrl}/api/chat?client=obsidian`;
@@ -1640,7 +1620,6 @@ export class KhojChatView extends KhojPaneView {
             ...(!!this.location && this.location.countryName && { country: this.location.countryName }),
             ...(!!this.location && this.location.countryCode && { country_code: this.location.countryCode }),
             ...(!!this.location && this.location.timezone && { timezone: this.location.timezone }),
-            ...(coreMemoryFilePath && { core_memory_file: coreMemoryFilePath }),
         };
         if (filename_prefix_mode) body.filename_prefix_mode = filename_prefix_mode;
         if (filename_prefix) body.filename_prefix = filename_prefix;
@@ -2287,6 +2266,37 @@ export class KhojChatView extends KhojPaneView {
     // Add this new method after the class declaration
     private async getOpenFilesContent(): Promise<string> {
         return this.fileInteractions.getOpenFilesContent(this.fileAccessMode);
+    }
+
+    // Add new method to get core memory content
+    private async getCoreMemoryContent(): Promise<string> {
+        if (!this.setting.coreMemoryFile) {
+            return '';
+        }
+
+        try {
+            const file = this.app.vault.getAbstractFileByPath(this.setting.coreMemoryFile);
+            if (!file || !(file instanceof TFile) || file.extension !== 'md') {
+                console.warn(`[Khoj] Core memory file not found or invalid: ${this.setting.coreMemoryFile}`);
+                return '';
+            }
+
+            // Read the core memory file content
+            const coreMemoryContent = await this.app.vault.read(file);
+            console.log(`[Khoj] Core memory file found and read: ${this.setting.coreMemoryFile} (length: ${coreMemoryContent.length} chars)`);
+
+            // Format the core memory content with contextualization
+            return `
+For context, here are your core memories about the user:
+<SYSTEM>
+
+${coreMemoryContent}
+</SYSTEM>
+`;
+        } catch (error) {
+            console.error(`[Khoj] Error reading core memory file: ${error}`);
+            return '';
+        }
     }
 
     private parseEditBlocks(message: string): EditBlock[] {

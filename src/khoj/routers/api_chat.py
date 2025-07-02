@@ -1251,37 +1251,6 @@ async def chat(
                 ):
                     yield result
 
-        ## Add Core Memory File to References (if specified)
-        import os
-
-        if core_memory_file:
-            logger.debug(f"[CoreMemory] Checking for core memory file at: {core_memory_file}")
-            try:
-                if os.path.exists(core_memory_file):
-                    try:
-                        with open(core_memory_file, "r", encoding="utf-8") as f:
-                            core_memory_content = f.read()
-                        logger.debug(
-                            f"[CoreMemory] Successfully read core memory file (length: {len(core_memory_content)} chars)"
-                        )
-
-                        core_memory_reference = {
-                            "query": "core memory",
-                            "compiled": f"[CORE MEMORY - User Profile]\n{core_memory_content}",
-                            "file": core_memory_file,  # Use absolute path for display
-                            "type": "core_memory",  # Special field to identify core memory
-                        }
-                        compiled_references.append(core_memory_reference)
-                        logger.info(
-                            f"[CoreMemory] Successfully attached core memory file: {core_memory_file} (length: {len(core_memory_content)} chars)"
-                        )
-                    except Exception as e:
-                        logger.warning(f"[CoreMemory] Error reading core memory file: {e}")
-                else:
-                    logger.warning(f"[CoreMemory] Core memory file not found: {core_memory_file}")
-            except Exception as e:
-                logger.warning(f"[CoreMemory] Error checking core memory file existence: {e}")
-
         ## Send Gathered References
         unique_online_results = deduplicate_organic_results(online_results)
         async for result in send_event(
