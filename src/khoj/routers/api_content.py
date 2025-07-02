@@ -591,9 +591,10 @@ async def indexer(
         for file in files:
             file_data = get_file_content(file)
             if file_data.file_type in index_files:
-                index_files[file_data.file_type][file_data.name] = (
-                    file_data.content.decode(file_data.encoding) if file_data.encoding else file_data.content
-                )
+                if file_data.encoding and isinstance(file_data.content, bytes):
+                    index_files[file_data.file_type][file_data.name] = file_data.content.decode(file_data.encoding)
+                else:
+                    index_files[file_data.file_type][file_data.name] = file_data.content
             else:
                 logger.warning(f"Skipped indexing unsupported file type sent by {client} client: {file_data.name}")
 
@@ -629,6 +630,12 @@ async def indexer(
             configure_search(state.search_models, state.config.search_type)
 
         loop = asyncio.get_event_loop()
+        # Ensure t is a SearchType or None for configure_content
+        if isinstance(t, str):
+            try:
+                t = state.SearchType(t)
+            except ValueError:
+                t = None
         success = await loop.run_in_executor(
             None,
             configure_content,
@@ -669,7 +676,6 @@ async def indexer(
     )
 
     logger.info(f"📪 Content index updated via API call by {client} client")
-    logger.info(f"✅ API indexing completed successfully for {client} client")
 
     indexed_filenames = ",".join(file for ctype in index_files for file in index_files[ctype]) or ""
     return Response(content=indexed_filenames, status_code=200)
