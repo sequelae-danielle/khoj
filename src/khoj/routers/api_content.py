@@ -586,13 +586,10 @@ async def indexer(
         "image": {},
         "docx": {},
     }
-    logger.debug(f"[indexer] Starting indexer for client={client}, method={method}, t={t}, regenerate={regenerate}")
     try:
         logger.info(f"📬 Updating content index via API call by {client} client")
-        logger.debug(f"[indexer] Processing {len(files)} files")
         for file in files:
             file_data = get_file_content(file)
-            logger.debug(f"[indexer] Processing file: {file_data.name}, type: {file_data.file_type}")
             if file_data.file_type in index_files:
                 if file_data.encoding and isinstance(file_data.content, bytes):
                     index_files[file_data.file_type][file_data.name] = file_data.content.decode(file_data.encoding)
@@ -601,7 +598,6 @@ async def indexer(
             else:
                 logger.warning(f"Skipped indexing unsupported file type sent by {client} client: {file_data.name}")
 
-        logger.debug(f"[indexer] index_files summary: {{k: len(v) for k, v in index_files.items()}}")
         indexer_input = IndexerInput(
             org=index_files["org"],
             markdown=index_files["markdown"],
@@ -613,7 +609,6 @@ async def indexer(
 
         if state.config == None:
             logger.info("📬 Initializing content index on first run.")
-            logger.debug("[indexer] state.config is None, initializing default configs")
             default_full_config = FullConfig(
                 content_type=None,
                 search_type=SearchConfig.model_validate(constants.default_config["search-type"]),
@@ -635,8 +630,6 @@ async def indexer(
             configure_search(state.search_models, state.config.search_type)
 
         loop = asyncio.get_event_loop()
-        logger.debug(f"[indexer] Calling configure_content with user={user}, regenerate={regenerate}, t={t}")
-        logger.debug(f"[indexer] indexer_input: {indexer_input.model_dump()}")
         # Ensure t is a SearchType or None for configure_content
         if isinstance(t, str):
             try:
@@ -651,9 +644,7 @@ async def indexer(
             regenerate,
             t,
         )
-        logger.debug(f"[indexer] configure_content returned: {success}")
         if not success:
-            logger.error(f"[indexer] configure_content returned False, raising RuntimeError")
             raise RuntimeError(f"Failed to {method} {t} data sent by {client} client into content index")
         logger.info(f"Finished {method} {t} data sent by {client} client into content index")
     except Exception as e:
@@ -662,7 +653,6 @@ async def indexer(
             f"🚨 Failed to {method} {t} data sent by {client} client into content index: {e}",
             exc_info=True,
         )
-        logger.debug(f"[indexer] Exception details: {e}")
         return Response(content="Failed", status_code=500)
 
     indexing_metadata = {
@@ -673,7 +663,6 @@ async def indexer(
         "num_image": len(index_files["image"]),
         "num_docx": len(index_files["docx"]),
     }
-    logger.debug(f"[indexer] indexing_metadata: {indexing_metadata}")
 
     update_telemetry_state(
         request=request,
@@ -687,7 +676,6 @@ async def indexer(
     )
 
     logger.info(f"📪 Content index updated via API call by {client} client")
-    logger.info(f"✅ API indexing completed successfully for {client} client")
 
     indexed_filenames = ",".join(file for ctype in index_files for file in index_files[ctype]) or ""
     return Response(content=indexed_filenames, status_code=200)
