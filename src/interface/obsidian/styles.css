@@ -410,8 +410,8 @@ div.selected-conversation {
 }
 
 .khoj-input-row {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto auto;
     background-color: var(--background-secondary-alt, var(--background-secondary));
     border-radius: 16px;
     padding: 8px 16px;
@@ -425,7 +425,7 @@ div.selected-conversation {
     gap: 0;
 }
 
-.khoj-input-row > *:not(.khoj-file-filter-container) {
+.khoj-main-input-container {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -842,6 +842,12 @@ div.khoj-logo:hover {
 
     .khoj-input-row {
         padding: 8px;
+        grid-template-rows: auto auto;
+        gap: 8px;
+    }
+
+    .khoj-main-input-container {
+        gap: 4px;
     }
 
     #khoj-chat-input {

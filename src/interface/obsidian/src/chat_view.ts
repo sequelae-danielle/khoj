@@ -277,7 +277,10 @@ export class KhojChatView extends KhojPaneView {
         // Add chat input field
         let inputRow = contentEl.createDiv("khoj-input-row");
 
-        let chatSessions = inputRow.createEl("button", {
+        // Create container for main input controls (top row)
+        let mainInputContainer = inputRow.createDiv("khoj-main-input-container");
+
+        let chatSessions = mainInputContainer.createEl("button", {
             text: "Chat Sessions",
             attr: {
                 class: "khoj-input-row-button clickable-icon",
@@ -288,7 +291,7 @@ export class KhojChatView extends KhojPaneView {
         setIcon(chatSessions, "history");
 
         // Add file access mode button
-        let fileAccessButton = inputRow.createEl("button", {
+        let fileAccessButton = mainInputContainer.createEl("button", {
             text: "File Access",
             attr: {
                 class: "khoj-input-row-button clickable-icon",
@@ -317,7 +320,7 @@ export class KhojChatView extends KhojPaneView {
             }
         });
 
-        let chatInput = inputRow.createEl("textarea", {
+        let chatInput = mainInputContainer.createEl("textarea", {
             attr: {
                 id: "khoj-chat-input",
                 autofocus: "autofocus",
@@ -334,7 +337,7 @@ export class KhojChatView extends KhojPaneView {
         this.contentEl.addEventListener('keydown', this.handleKeyDown.bind(this));
         this.contentEl.addEventListener('keyup', this.handleKeyUp.bind(this));
 
-        let transcribe = inputRow.createEl("button", {
+        let transcribe = mainInputContainer.createEl("button", {
             text: "Transcribe",
             attr: {
                 id: "khoj-transcribe",
@@ -349,7 +352,7 @@ export class KhojChatView extends KhojPaneView {
         transcribe.addEventListener('touchcancel', async (event) => { await this.speechToText(event) });
         setIcon(transcribe, "mic");
 
-        let send = inputRow.createEl("button", {
+        let send = mainInputContainer.createEl("button", {
             text: "Send",
             attr: {
                 id: "khoj-chat-send",
