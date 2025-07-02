@@ -690,7 +690,6 @@ async def chat(
     filename_prefix_mode = body.filename_prefix_mode
     filename_prefix = body.filename_prefix
     file_extension = body.file_extension
-    core_memory_file = body.core_memory_file
 
     async def event_generator(q: str, images: list[str]):
         start_time = time.perf_counter()
