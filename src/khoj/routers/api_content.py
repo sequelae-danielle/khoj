@@ -669,6 +669,7 @@ async def indexer(
     )
 
     logger.info(f"📪 Content index updated via API call by {client} client")
+    logger.info(f"✅ API indexing completed successfully for {client} client")
 
     indexed_filenames = ",".join(file for ctype in index_files for file in index_files[ctype]) or ""
     return Response(content=indexed_filenames, status_code=200)
