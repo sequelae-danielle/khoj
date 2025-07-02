@@ -215,7 +215,22 @@ export class KhojSettingTab extends PluginSettingTab {
                 text.setPlaceholder('e.g. _khoj-memory/_khoj-00-core-memory.md')
                     .setValue(this.plugin.settings.coreMemoryFile || '')
                     .onChange(async (value) => {
-                        this.plugin.settings.coreMemoryFile = value.trim();
+                        // Defensive: always store vault-relative path
+                        let pathToSave = value.trim();
+                        // Try to get the vault base path if available
+                        let vaultRoot = '';
+                        if ((this.app.vault.adapter as any).basePath) {
+                            vaultRoot = (this.app.vault.adapter as any).basePath;
+                        }
+                        if (vaultRoot && pathToSave.startsWith(vaultRoot)) {
+                            pathToSave = pathToSave.substring(vaultRoot.length + 1);
+                        }
+                        // Warn if still looks like absolute path
+                        if (pathToSave.startsWith('/')) {
+                            new Notice('Please use a vault-relative path for core memory file.');
+                            pathToSave = pathToSave.replace(/^\/+/, '');
+                        }
+                        this.plugin.settings.coreMemoryFile = pathToSave;
                         await this.plugin.saveSettings();
                     });
                 // Store reference to text input for use in button callback
@@ -225,10 +240,23 @@ export class KhojSettingTab extends PluginSettingTab {
                 button.setButtonText('Pick File')
                     .onClick(() => {
                         new FileSuggestModal(this.app, (file: string) => {
-                            this.plugin.settings.coreMemoryFile = file;
+                            // Defensive: always store vault-relative path
+                            let pathToSave = file;
+                            let vaultRoot = '';
+                            if ((this.app.vault.adapter as any).basePath) {
+                                vaultRoot = (this.app.vault.adapter as any).basePath;
+                            }
+                            if (vaultRoot && pathToSave.startsWith(vaultRoot)) {
+                                pathToSave = pathToSave.substring(vaultRoot.length + 1);
+                            }
+                            if (pathToSave.startsWith('/')) {
+                                new Notice('Please use a vault-relative path for core memory file.');
+                                pathToSave = pathToSave.replace(/^\/+/, '');
+                            }
+                            this.plugin.settings.coreMemoryFile = pathToSave;
                             // Use the closure variable to set the value
                             const text = (this as any)._coreMemoryTextInput;
-                            if (text) text.setValue(file);
+                            if (text) text.setValue(pathToSave);
                             this.plugin.saveSettings();
                         }).open();
                     });
