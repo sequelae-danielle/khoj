@@ -1917,9 +1917,7 @@ class EntryAdapters:
             # Use os.path.basename in Python, but in Django ORM, use regex on file_path
             prefix_q = Q()
             for prefix in filename_prefixes:
-                # More robust regex that matches filenames starting with the prefix
-                # This handles cases where there might not be a trailing slash
-                # and works with different path structures
+                # Regex that matches filenames starting with the prefix
                 regex = rf"[^/]*({ '|'.join(map(re.escape, filename_prefixes)) })[^/]*$"
                 prefix_q |= Q(file_path__regex=regex)
             if filename_prefix_mode == "exclude":
