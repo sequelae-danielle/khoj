@@ -1977,14 +1977,16 @@ class EntryAdapters:
                 ext = ext if ext.startswith(".") else f".{ext}"
                 ext_q |= Q(file_path__iendswith=ext)
             queryset = queryset.filter(ext_q)
-
         # --- New: Filename prefix filtering ---
         if filename_prefixes:
             # Use os.path.basename in Python, but in Django ORM, use regex on file_path
             prefix_q = Q()
             for prefix in filename_prefixes:
-                # Regex that matches filenames starting with the prefix
-                regex = rf"[^/]*({ '|'.join(map(re.escape, filename_prefixes)) })[^/]*$"
+                # Regex: /[^/]+$ matches the basename, ^prefix matches start
+                # So: r"/(_khoj|_)" matches files whose basename starts with _khoj or _
+                # But we want to match the basename only, so use regex for end of path
+                # Django doesn't have direct basename, so we use regex: r"/(_khoj|_)[^/]*$"
+                regex = rf"/({ '|'.join(map(re.escape, filename_prefixes)) })[^/]*$"
                 prefix_q |= Q(file_path__regex=regex)
             if filename_prefix_mode == "exclude":
                 queryset = queryset.exclude(prefix_q)
