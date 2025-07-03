@@ -208,8 +208,10 @@ export class KhojChatView extends KhojPaneView {
                     }
                 });
             }
+            // Convert array to comma-separated string for backend API
+            const file_extension = file_extensions.join(',');
             // Pass these to getChatResponse
-            await this.getChatResponse(apiMessage, displayMessage, isVoice, true, filename_prefix_mode, filename_prefix, file_extensions);
+            await this.getChatResponse(apiMessage, displayMessage, isVoice, true, filename_prefix_mode, filename_prefix, file_extension);
         }
     }
 
@@ -1551,7 +1553,7 @@ export class KhojChatView extends KhojPaneView {
         displayUserMessage: boolean = true,
         filename_prefix_mode?: string,
         filename_prefix?: string,
-        file_extensions?: string[]
+        file_extension?: string
     ): Promise<void> {
         // Exit if query is empty
         if (!query || query === "") return;
@@ -1622,7 +1624,7 @@ export class KhojChatView extends KhojPaneView {
         };
         if (filename_prefix_mode) body.filename_prefix_mode = filename_prefix_mode;
         if (filename_prefix) body.filename_prefix = filename_prefix;
-        if (file_extensions && file_extensions.length > 0) body.file_extension = file_extensions.join(',');
+        if (file_extension) body.file_extension = file_extension;
 
         let newResponseEl = this.createKhojResponseDiv();
         let newResponseTextEl = newResponseEl.createDiv();
