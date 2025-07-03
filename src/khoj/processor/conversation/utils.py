@@ -783,8 +783,17 @@ def count_tokens(
                 image_count += 1
             elif isinstance(part, dict) and part.get("type") == "text":
                 message_content_parts.append(part["text"])
+            elif isinstance(part, dict) and hasattr(part, "model_dump"):
+                message_content_parts.append(json.dumps(part.model_dump()))
+            elif isinstance(part, dict) and hasattr(part, "__dict__"):
+                message_content_parts.append(json.dumps(part.__dict__))
             elif isinstance(part, dict):
-                message_content_parts.append(json.dumps(part))
+                # If part is a dict but not a recognized type, convert to JSON string
+                try:
+                    message_content_parts.append(json.dumps(part))
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Failed to serialize part {part} to JSON: {e}. Skipping.")
+                    image_count += 1  # Treat as an image/binary if serialization fails
             elif isinstance(part, str):
                 message_content_parts.append(part)
             else:
