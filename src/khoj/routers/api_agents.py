@@ -72,7 +72,7 @@ async def all_agents(
             "color": agent.style_color,
             "icon": agent.style_icon,
             "privacy_level": agent.privacy_level,
-            "chat_model": agent_chat_model.name,
+            "chat_model": agent_chat_model.friendly_name,
             "files": file_names,
             "input_tools": agent.input_tools,
             "output_modes": agent.output_modes,
@@ -134,7 +134,7 @@ async def get_agent_by_conversation(
 
     chat_model = await AgentAdapters.aget_agent_chat_model(agent, user)
     if is_subscribed or chat_model.price_tier == PriceTier.FREE:
-        agent_chat_model = chat_model.name
+        agent_chat_model = chat_model.friendly_name
     else:
         agent_chat_model = None
 
@@ -219,7 +219,7 @@ async def get_agent(
         "color": agent.style_color,
         "icon": agent.style_icon,
         "privacy_level": agent.privacy_level,
-        "chat_model": agent.chat_model.name,
+        "chat_model": agent.chat_model.friendly_name,
         "files": file_names,
         "input_tools": agent.input_tools,
         "output_modes": agent.output_modes,
@@ -261,9 +261,9 @@ async def update_hidden_agent(
     user: KhojUser = request.user.object
 
     subscribed = has_required_scope(request, ["premium"])
-    chat_model = await ConversationAdapters.aget_chat_model_by_name(body.chat_model)
+    chat_model = await ConversationAdapters.aget_chat_model_by_friendly_name(body.chat_model)
     if subscribed or chat_model.price_tier == PriceTier.FREE:
-        agent_chat_model = body.chat_model
+        agent_chat_model = chat_model.name
     else:
         agent_chat_model = None
 
@@ -292,7 +292,7 @@ async def update_hidden_agent(
         "name": agent.name,
         "persona": agent.personality,
         "creator": agent.creator.username if agent.creator else None,
-        "chat_model": agent.chat_model.name,
+        "chat_model": agent.chat_model.friendly_name,
         "input_tools": agent.input_tools,
         "output_modes": agent.output_modes,
     }
@@ -311,9 +311,9 @@ async def create_hidden_agent(
     user: KhojUser = request.user.object
 
     subscribed = has_required_scope(request, ["premium"])
-    chat_model = await ConversationAdapters.aget_chat_model_by_name(body.chat_model)
+    chat_model = await ConversationAdapters.aget_chat_model_by_friendly_name(body.chat_model)
     if subscribed or chat_model.price_tier == PriceTier.FREE:
-        agent_chat_model = body.chat_model
+        agent_chat_model = chat_model.name
     else:
         agent_chat_model = None
 
@@ -355,7 +355,7 @@ async def create_hidden_agent(
         "name": agent.name,
         "persona": agent.personality,
         "creator": agent.creator.username if agent.creator else None,
-        "chat_model": agent.chat_model.name,
+        "chat_model": agent.chat_model.friendly_name,
         "input_tools": agent.input_tools,
         "output_modes": agent.output_modes,
     }
@@ -384,9 +384,9 @@ async def create_agent(
         )
 
     subscribed = has_required_scope(request, ["premium"])
-    chat_model = await ConversationAdapters.aget_chat_model_by_name(body.chat_model)
+    chat_model = await ConversationAdapters.aget_chat_model_by_friendly_name(body.chat_model)
     if subscribed or chat_model.price_tier == PriceTier.FREE:
-        agent_chat_model = body.chat_model
+        agent_chat_model = chat_model.name
     else:
         agent_chat_model = None
 
@@ -415,7 +415,7 @@ async def create_agent(
         "color": agent.style_color,
         "icon": agent.style_icon,
         "privacy_level": agent.privacy_level,
-        "chat_model": agent.chat_model.name,
+        "chat_model": agent.chat_model.friendly_name,
         "files": body.files,
         "input_tools": agent.input_tools,
         "output_modes": agent.output_modes,
@@ -434,17 +434,6 @@ async def update_agent(
 ) -> Response:
     user: KhojUser = request.user.object
 
-    is_safe_prompt, reason = await acheck_if_safe_prompt(
-        body.persona, user, lax=body.privacy_level == Agent.PrivacyLevel.PRIVATE
-    )
-
-    if not is_safe_prompt:
-        return Response(
-            content=json.dumps({"error": f"{reason}"}),
-            media_type="application/json",
-            status_code=400,
-        )
-
     selected_agent = await AgentAdapters.aget_agent_by_slug(body.slug, user)
 
     if not selected_agent:
@@ -454,10 +443,23 @@ async def update_agent(
             status_code=404,
         )
 
+    if selected_agent.personality != body.persona:
+        # Check if the new persona is safe
+        is_safe_prompt, reason = await acheck_if_safe_prompt(
+            body.persona, user, lax=body.privacy_level == Agent.PrivacyLevel.PRIVATE
+        )
+
+        if not is_safe_prompt:
+            return Response(
+                content=json.dumps({"error": f"{reason}"}),
+                media_type="application/json",
+                status_code=400,
+            )
+
     subscribed = has_required_scope(request, ["premium"])
-    chat_model = await ConversationAdapters.aget_chat_model_by_name(body.chat_model)
+    chat_model = await ConversationAdapters.aget_chat_model_by_friendly_name(body.chat_model)
     if subscribed or chat_model.price_tier == PriceTier.FREE:
-        agent_chat_model = body.chat_model
+        agent_chat_model = chat_model.name
     else:
         agent_chat_model = None
 
@@ -485,7 +487,7 @@ async def update_agent(
         "color": agent.style_color,
         "icon": agent.style_icon,
         "privacy_level": agent.privacy_level,
-        "chat_model": agent.chat_model.name,
+        "chat_model": agent.chat_model.friendly_name,
         "files": body.files,
         "input_tools": agent.input_tools,
         "output_modes": agent.output_modes,
