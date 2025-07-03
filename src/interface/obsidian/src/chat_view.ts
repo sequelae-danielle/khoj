@@ -836,9 +836,9 @@ export class KhojChatView extends KhojPaneView {
         chatMessageBodyEl.addClasses(["khoj-chat-message-text", sender]);
         let chatMessageBodyTextEl = chatMessageBodyEl.createDiv();
 
-        // Remove Obsidian specific instructions sent alongside user query in between <SYSTEM></SYSTEM> tags
+        // Remove Obsidian specific instructions sent alongside user query in between <SYSTEM-M></SYSTEM-M> and <SYSTEM-F></SYSTEM-F> tags
         if (sender === "you") {
-            message = message.replace(/<SYSTEM>.*?<\/SYSTEM>/s, '');
+            message = message.replace(/<SYSTEM-M>.*?<\/SYSTEM-M>/s, '').replace(/<SYSTEM-F>.*?<\/SYSTEM-F>/s, '');
         }
 
         // Sanitize the markdown to render
@@ -2280,7 +2280,7 @@ export class KhojChatView extends KhojPaneView {
                 return '';
             }
             const coreMemoryContent = await this.app.vault.read(file);
-            return `\n<SYSTEM>\nFor context, here are your core memories about the user:\n<CORE_MEMORY>\n${coreMemoryContent}\n</CORE_MEMORY>\n</SYSTEM>\n`;
+            return `\n<SYSTEM-M>\nFor context, here are your core memories about the user:\n<CORE_MEMORY>\n${coreMemoryContent}\n</CORE_MEMORY>\n</SYSTEM-M>\n`;
         } catch (err) {
             return '';
         }
