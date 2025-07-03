@@ -967,6 +967,10 @@ def defilter_query(query: str):
     filters: List[BaseFilter] = [WordFilter(), FileFilter(), DateFilter()]
     for filter in filters:
         defiltered_query = filter.defilter(defiltered_query)
+
+    # Remove system tags (core memory and open files content)
+    defiltered_query = re.sub(r"<SYSTEM-[MF]>.*?</SYSTEM-[MF]>", "", defiltered_query, flags=re.DOTALL).strip()
+
     return defiltered_query
 
 
