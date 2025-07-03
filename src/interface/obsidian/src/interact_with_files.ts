@@ -296,9 +296,9 @@ For context, the user is currently working on the following files:
         // Collate open files content with instructions
         let context: string;
         if (fileAccessMode === 'write') {
-             context = `\n\n<SYSTEM>${editInstructions + openFilesContent}</SYSTEM>`;
+             context = `\n\n<SYSTEM-F>${editInstructions + openFilesContent}</SYSTEM-F>`;
         } else {
-             context = `\n\n<SYSTEM>${openFilesContent}</SYSTEM>`;
+             context = `\n\n<SYSTEM-F>${openFilesContent}</SYSTEM-F>`;
         }
 
         return context;
