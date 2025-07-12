@@ -327,7 +327,7 @@ def format_messages_for_anthropic(raw_messages: list[ChatMessage], system_prompt
     if len(messages) == 1 and message_type != "tool_call":
         messages[0].role = "user"
 
-    for message in messages:
+    for message in reversed(messages):  # Process in reverse to not mess up iterator when drop invalid messages
         # Handle tool call and tool result message types from additional_kwargs
         message_type = message.additional_kwargs.get("message_type")
         if message_type == "tool_call":
@@ -336,6 +336,10 @@ def format_messages_for_anthropic(raw_messages: list[ChatMessage], system_prompt
             # Convert tool_result to Anthropic tool_result format
             content = []
             for part in message.content:
+                # Skip tool results without valid tool_use_id as Anthropic API requires string IDs
+                if not part.get("id"):
+                    logger.warning(f"Dropping tool result without valid tool_use_id: {part.get('name')}")
+                    continue
                 content.append(
                     {
                         "type": "tool_result",
@@ -375,7 +379,7 @@ def format_messages_for_anthropic(raw_messages: list[ChatMessage], system_prompt
             message.content = content
 
         if is_none_or_empty(message.content):
-            logger.error(f"Drop message with empty content as not supported:\n{message}")
+            logger.warning(f"Drop message with empty content as not supported:\n{message}")
             messages.remove(message)
             continue
         if isinstance(message.content, str):

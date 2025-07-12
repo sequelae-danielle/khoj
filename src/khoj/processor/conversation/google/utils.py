@@ -4,7 +4,7 @@ import os
 import random
 from copy import deepcopy
 from time import perf_counter
-from typing import AsyncGenerator, AsyncIterator, Dict, List
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List
 
 import httpx
 from google import genai
@@ -76,7 +76,11 @@ def _is_retryable_error(exception: BaseException) -> bool:
     if isinstance(exception, gerrors.APIError):
         return exception.code in [429, 502, 503, 504]
     # client errors
-    if isinstance(exception, httpx.TimeoutException) or isinstance(exception, httpx.NetworkError):
+    if (
+        isinstance(exception, httpx.TimeoutException)
+        or isinstance(exception, httpx.NetworkError)
+        or isinstance(exception, httpx.ReadError)
+    ):
         return True
     # validation errors
     if isinstance(exception, ValueError):
@@ -95,7 +99,7 @@ def gemini_completion_with_backoff(
     messages: list[ChatMessage],
     system_prompt: str,
     model_name: str,
-    temperature=1.2,
+    temperature=1.0,
     api_key=None,
     api_base_url: str = None,
     model_kwargs={},
@@ -376,7 +380,7 @@ def format_messages_for_gemini(
             messages.remove(message)
     system_prompt = None if is_none_or_empty(system_prompt) else system_prompt
 
-    for message in messages:
+    for message in reversed(messages):  # Process in reverse to not mess up iterator when drop invalid messages
         if message.role == "assistant":
             message.role = "model"
 
@@ -408,9 +412,9 @@ def format_messages_for_gemini(
                 elif not is_none_or_empty(item.get("text")):
                     message_content += [gtypes.Part.from_text(text=item["text"])]
                 else:
-                    logger.error(f"Dropping invalid message content part: {item}")
+                    logger.warning(f"Dropping invalid message content part: {item}")
             if not message_content:
-                logger.error(f"Dropping message with empty content as not supported:\n{message}")
+                logger.warning(f"Dropping message with empty content as not supported:\n{message}")
                 messages.remove(message)
                 continue
             message.content = message_content
@@ -452,13 +456,31 @@ def is_reasoning_model(model_name: str) -> bool:
 
 def to_gemini_tools(tools: List[ToolDefinition]) -> List[gtypes.ToolDict] | None:
     "Transform tool definitions from standard format to Gemini format."
+
+    def clean_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove additionalProperties from schema as Gemini doesn't accept it."""
+        if not isinstance(schema, dict):
+            return schema
+
+        cleaned: Dict[str, Any] = {}
+        for key, value in schema.items():
+            if key == "additionalProperties":
+                continue
+            if isinstance(value, dict):
+                cleaned[key] = clean_schema(value)
+            elif isinstance(value, list):
+                cleaned[key] = [clean_schema(item) if isinstance(item, dict) else item for item in value]
+            else:
+                cleaned[key] = value
+        return cleaned
+
     gemini_tools = [
         gtypes.ToolDict(
             function_declarations=[
                 gtypes.FunctionDeclarationDict(
                     name=tool.name,
                     description=tool.description,
-                    parameters=tool.schema,
+                    parameters=clean_schema(tool.schema),
                 )
                 for tool in tools
             ]

@@ -703,8 +703,7 @@ class AgentAdapters:
         if agent.creator != user:
             return False
 
-        async for entry in Entry.objects.filter(agent=agent).aiterator():
-            await entry.adelete()
+        await Entry.objects.filter(agent=agent).adelete()
 
         if agent:
             await agent.adelete()
@@ -1489,9 +1488,10 @@ class ConversationAdapters:
             conversation.updated_at = django_timezone.now()
             await conversation.asave()
         else:
-            await Conversation.objects.acreate(
+            conversation = await Conversation.objects.acreate(
                 user=user, conversation_log=cleaned_conversation_log, client=client_application, slug=slug
             )
+        return conversation
 
     @staticmethod
     def get_conversation_processor_options():

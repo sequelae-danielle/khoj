@@ -359,18 +359,23 @@ def get_structured_output_support(model_name: str, api_base_url: str = None) -> 
     return StructuredOutputSupport.TOOL
 
 
-def format_message_for_api(messages: List[ChatMessage], api_base_url: str) -> List[dict]:
+def format_message_for_api(raw_messages: List[ChatMessage], api_base_url: str) -> List[dict]:
     """
     Format messages to send to chat model served over OpenAI (compatible) API.
     """
     formatted_messages = []
-    for message in deepcopy(messages):
+    messages = deepcopy(raw_messages)
+    for message in reversed(messages):  # Process in reverse to not mess up iterator when drop invalid messages
         # Handle tool call and tool result message types
         message_type = message.additional_kwargs.get("message_type")
         if message_type == "tool_call":
             # Convert tool_call to OpenAI function call format
             content = []
             for part in message.content:
+                # Skip tool calls without valid IDs as OpenAI API requires string IDs
+                if not part.get("id"):
+                    logger.warning(f"Dropping tool call without valid ID: {part.get('name')}")
+                    continue
                 content.append(
                     {
                         "type": "function",
@@ -381,22 +386,31 @@ def format_message_for_api(messages: List[ChatMessage], api_base_url: str) -> Li
                         },
                     }
                 )
-            formatted_messages.append(
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": content,
-                }
-            )
+            # Only add the message if there are valid tool calls
+            if content:
+                formatted_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": content,
+                    }
+                )
+            else:
+                logger.warning("Dropping tool call message with no valid tool calls")
             continue
         if message_type == "tool_result":
             # Convert tool_result to OpenAI tool result format
             # Each part is a result for a tool call
             for part in message.content:
+                tool_call_id = part.get("id") or part.get("tool_use_id")
+                # Skip tool results without valid tool_call_id as OpenAI API requires string IDs
+                if not tool_call_id:
+                    logger.warning(f"Dropping tool result without valid tool_call_id: {part.get('name')}")
+                    continue
                 formatted_messages.append(
                     {
                         "role": "tool",
-                        "tool_call_id": part.get("id") or part.get("tool_use_id"),
+                        "tool_call_id": tool_call_id,
                         "name": part.get("name"),
                         "content": part.get("content"),
                     }
@@ -425,9 +439,24 @@ def format_message_for_api(messages: List[ChatMessage], api_base_url: str) -> Li
                     message.content += [{"type": "text", "text": assistant_texts_str}]
                 else:
                     message.content = assistant_texts_str
+        elif isinstance(message.content, list):
+            # Drop invalid content parts
+            for part in reversed(message.content):
+                if part["type"] == "text" and not part.get("text"):
+                    message.content.remove(part)
+                elif part["type"] == "image_url" and not part.get("image_url"):
+                    message.content.remove(part)
+            # If no valid content parts left, remove the message
+            if is_none_or_empty(message.content):
+                messages.remove(message)
+                continue
+        elif isinstance(message.content, str) and not message.content.strip():
+            # If content is empty string, remove the message
+            messages.remove(message)
+            continue
         formatted_messages.append({"role": message.role, "content": message.content})
 
-    return formatted_messages
+    return list(reversed(formatted_messages))
 
 
 def is_openai_api(api_base_url: str = None) -> bool:
@@ -527,7 +556,19 @@ async def adefault_stream_processor(
     Async generator to cast and return chunks from the standard openai chat completions stream.
     """
     async for chunk in chat_stream:
-        yield ChatCompletionWithThoughtsChunk.model_validate(chunk.model_dump())
+        try:
+            # Validate the chunk has the required fields before processing
+            chunk_data = chunk.model_dump()
+
+            # Skip chunks that don't have the required object field or have invalid values
+            if not chunk_data.get("object") or chunk_data.get("object") != "chat.completion.chunk":
+                logger.warning(f"Skipping invalid chunk with object field: {chunk_data.get('object', 'missing')}")
+                continue
+
+            yield ChatCompletionWithThoughtsChunk.model_validate(chunk_data)
+        except Exception as e:
+            logger.warning(f"Error processing chunk: {e}. Skipping malformed chunk.")
+            continue
 
 
 async def adeepseek_stream_processor(
@@ -537,14 +578,26 @@ async def adeepseek_stream_processor(
     Async generator to cast and return chunks from the deepseek chat completions stream.
     """
     async for chunk in chat_stream:
-        tchunk = ChatCompletionWithThoughtsChunk.model_validate(chunk.model_dump())
-        if (
-            len(tchunk.choices) > 0
-            and hasattr(tchunk.choices[0].delta, "reasoning_content")
-            and tchunk.choices[0].delta.reasoning_content
-        ):
-            tchunk.choices[0].delta.thought = chunk.choices[0].delta.reasoning_content
-        yield tchunk
+        try:
+            # Validate the chunk has the required fields before processing
+            chunk_data = chunk.model_dump()
+
+            # Skip chunks that don't have the required object field or have invalid values
+            if not chunk_data.get("object") or chunk_data.get("object") != "chat.completion.chunk":
+                logger.warning(f"Skipping invalid chunk with object field: {chunk_data.get('object', 'missing')}")
+                continue
+
+            tchunk = ChatCompletionWithThoughtsChunk.model_validate(chunk_data)
+            if (
+                len(tchunk.choices) > 0
+                and hasattr(tchunk.choices[0].delta, "reasoning_content")
+                and tchunk.choices[0].delta.reasoning_content
+            ):
+                tchunk.choices[0].delta.thought = chunk.choices[0].delta.reasoning_content
+            yield tchunk
+        except Exception as e:
+            logger.warning(f"Error processing chunk: {e}. Skipping malformed chunk.")
+            continue
 
 
 def in_stream_thought_processor(

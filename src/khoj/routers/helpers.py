@@ -619,13 +619,13 @@ def schedule_query(
 
     # Validate that the response is a non-empty, JSON-serializable list
     try:
-        raw_response = raw_response.strip()
-        response: Dict[str, str] = json.loads(clean_json(raw_response))
+        raw_response_text = raw_response.text
+        response: Dict[str, str] = json.loads(clean_json(raw_response_text))
         if not response or not isinstance(response, Dict) or len(response) != 3:
             raise AssertionError(f"Invalid response for scheduling query : {response}")
         return response.get("crontime"), response.get("query"), response.get("subject")
     except Exception:
-        raise AssertionError(f"Invalid response for scheduling query: {raw_response}")
+        raise AssertionError(f"Invalid response for scheduling query: {raw_response.text}")
 
 
 async def aschedule_query(
@@ -1275,8 +1275,9 @@ async def search_documents(
         compiled_references = [
             {
                 "query": item.additional["query"],
-                "compiled": item.additional["compiled"],
+                "compiled": item["entry"],
                 "file": item.additional["file"],
+                "uri": item.additional["uri"],
             }
             for item in search_results
         ]
@@ -2147,7 +2148,8 @@ def format_automation_response(scheduling_request: str, executed_query: str, ai_
     )
 
     with timer("Chat actor: Format automation response", logger):
-        return send_message_to_model_wrapper_sync(automation_format_prompt, user=user)
+        raw_response = send_message_to_model_wrapper_sync(automation_format_prompt, user=user)
+        return raw_response.text if raw_response else None
 
 
 def should_notify(original_query: str, executed_query: str, ai_response: str, user: KhojUser) -> bool:
@@ -2167,8 +2169,10 @@ def should_notify(original_query: str, executed_query: str, ai_response: str, us
     with timer("Chat actor: Decide to notify user of automation response", logger):
         try:
             # TODO Replace with async call so we don't have to maintain a sync version
-            raw_response = send_message_to_model_wrapper_sync(to_notify_or_not, user=user, response_type="json_object")
-            response = json.loads(clean_json(raw_response))
+            raw_response: ResponseWithThought = send_message_to_model_wrapper_sync(
+                to_notify_or_not, user=user, response_type="json_object"
+            )
+            response = json.loads(clean_json(raw_response.text))
             should_notify_result = response["decision"] == "Yes"
             reason = response.get("reason", "unknown")
             logger.info(
@@ -2188,7 +2192,7 @@ def scheduled_chat(
     scheduling_request: str,
     subject: str,
     user: KhojUser,
-    calling_url: URL,
+    calling_url: str | URL,
     job_id: str = None,
     conversation_id: str = None,
 ):
@@ -2208,8 +2212,9 @@ def scheduled_chat(
                 return
 
     # Extract relevant params from the original URL
-    scheme = "http" if not calling_url.is_secure else "https"
-    query_dict = parse_qs(calling_url.query)
+    parsed_url = URL(calling_url) if isinstance(calling_url, str) else calling_url
+    scheme = "http" if not parsed_url.is_secure else "https"
+    query_dict = parse_qs(parsed_url.query)
 
     # Pop the stream value from query_dict if it exists
     query_dict.pop("stream", None)
@@ -2231,7 +2236,7 @@ def scheduled_chat(
     json_payload = {key: values[0] for key, values in query_dict.items()}
 
     # Construct the URL to call the chat API with the scheduled query string
-    url = f"{scheme}://{calling_url.netloc}/api/chat?client=khoj"
+    url = f"{scheme}://{parsed_url.netloc}/api/chat?client=khoj"
 
     # Construct the Headers for the chat API
     headers = {"User-Agent": "Khoj", "Content-Type": "application/json"}
@@ -2891,6 +2896,7 @@ async def view_file_content(
             {
                 "query": query,
                 "file": path,
+                "uri": path,
                 "compiled": filtered_text,
             }
         ]
@@ -2902,7 +2908,7 @@ async def view_file_content(
         logger.error(error_msg, exc_info=True)
 
         # Return an error result in the expected format
-        yield [{"query": query, "file": path, "compiled": error_msg}]
+        yield [{"query": query, "file": path, "uri": path, "compiled": error_msg}]
 
 
 async def grep_files(
@@ -3006,7 +3012,7 @@ async def grep_files(
             max_results,
         )
         if not line_matches:
-            yield {"query": query, "file": path_prefix, "compiled": "No matches found."}
+            yield {"query": query, "file": path_prefix, "uri": path_prefix, "compiled": "No matches found."}
             return
 
         # Truncate matched lines list if too long
@@ -3015,7 +3021,7 @@ async def grep_files(
                 f"... {len(line_matches) - max_results} more results found. Use stricter regex or path to narrow down results."
             ]
 
-        yield {"query": query, "file": path_prefix or "", "compiled": "\n".join(line_matches)}
+        yield {"query": query, "file": path_prefix, "uri": path_prefix, "compiled": "\n".join(line_matches)}
 
     except Exception as e:
         error_msg = f"Error using grep files tool: {str(e)}"
@@ -3024,6 +3030,7 @@ async def grep_files(
             {
                 "query": _generate_query(0, 0, path_prefix or "", regex_pattern, lines_before, lines_after),
                 "file": path_prefix,
+                "uri": path_prefix,
                 "compiled": error_msg,
             }
         ]
@@ -3056,7 +3063,7 @@ async def list_files(
             file_objects = await FileObjectAdapters.aget_file_objects_by_path_prefix(user, path)
 
         if not file_objects:
-            yield {"query": _generate_query(0, path, pattern), "file": path, "compiled": "No files found."}
+            yield {"query": _generate_query(0, path, pattern), "file": path, "uri": path, "compiled": "No files found."}
             return
 
         # Extract file names from file objects
@@ -3071,7 +3078,7 @@ async def list_files(
 
         query = _generate_query(len(files), path, pattern)
         if not files:
-            yield {"query": query, "file": path, "compiled": "No files found."}
+            yield {"query": query, "file": path, "uri": path, "compiled": "No files found."}
             return
 
         # Truncate the list if it's too long
@@ -3081,9 +3088,9 @@ async def list_files(
                 f"... {len(files) - max_files} more files found. Use glob pattern to narrow down results."
             ]
 
-        yield {"query": query, "file": path, "compiled": "\n- ".join(files)}
+        yield {"query": query, "file": path, "uri": path, "compiled": "\n- ".join(files)}
 
     except Exception as e:
         error_msg = f"Error listing files in {path}: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        yield {"query": query, "file": path, "compiled": error_msg}
+        yield {"query": query, "file": path, "uri": path, "compiled": error_msg}

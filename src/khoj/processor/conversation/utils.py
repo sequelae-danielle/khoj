@@ -491,8 +491,9 @@ async def save_to_conversation_log(
         updated_conversation = None
         logger.error(f"Error constructing chat history: {e}")
 
+    db_conversation = None
     if updated_conversation:
-        await ConversationAdapters.save_conversation(
+        db_conversation = await ConversationAdapters.save_conversation(
             user,
             updated_conversation,
             client_application=client_application,
@@ -505,7 +506,7 @@ async def save_to_conversation_log(
 
     logger.info(
         f"""
-Saved Conversation Turn
+Saved Conversation Turn ({db_conversation.id if db_conversation else 'N/A'}):
 You ({user.username}): "{q}"
 
 Khoj: "{chat_response}"
@@ -646,7 +647,11 @@ def generate_chatml_messages_with_context(
 
         if not is_none_or_empty(chat.context):
             references = "\n\n".join(
-                {f"# File: {item.file}\n## {item.compiled}\n" for item in chat.context or [] if isinstance(item, dict)}
+                {
+                    f"# URI: {item.uri or item.file}\n## {item.compiled}\n"
+                    for item in chat.context or []
+                    if isinstance(item, dict)
+                }
             )
             message_context += [{"type": "text", "text": f"{prompts.notes_conversation.format(references=references)}"}]
 
